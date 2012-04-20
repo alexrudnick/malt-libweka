@@ -1,1 +1,5 @@
+These are the scripts used to run the experiments for alexr's parsing
+qualifiers project. They may not be directly useful to you, but are included
+here for reproducibility.
+
 Run these scripts from one directory up.
