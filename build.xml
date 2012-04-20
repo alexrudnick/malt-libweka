@@ -30,10 +30,15 @@
         <jar jarfile="${dist}/lib/maltlibweka.jar" basedir="${build}"/>
     </target>
 
-  <target name="clean" description="clean up" >
-    <delete dir="${build}"/>
-    <delete dir="${dist}"/>
-  </target>
+    <target name="updatemalt"
+            description="replace to options.xml in the malt jar.">
+        <jar jarfile="lib/maltparser-1.7.1.jar"
+             update="true"
+             basedir="config"/>
+    </target>
 
-
+    <target name="clean" description="clean up" >
+        <delete dir="${build}"/>
+        <delete dir="${dist}"/>
+    </target>
 </project>

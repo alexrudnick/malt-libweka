@@ -8,7 +8,6 @@
 ## $3: "options for the library"
 ## $4: test set (eg /path/to/danish_ddt_test.conll)
 
-
 EXPECTED_ARGS=4
 E_BADARGS=65
 if [ $# -ne $EXPECTED_ARGS ]; then
@@ -16,7 +15,6 @@ if [ $# -ne $EXPECTED_ARGS ]; then
   exit $E_BADARGS
 fi
 
-THEJAR=maltparser-1.7/dist/maltparser-1.7/maltparser-1.7.jar
 LANG_SIZE=$1
 LEARNER=$2
 WEKACLASSIFIER=$3
@@ -27,12 +25,25 @@ MODELNAME=$EXPNAME
 OUTFILE=$EXPNAME"_outfile.conll"
 RESULTS="results/"$EXPNAME".results"
 
+CLASSPATH=lib/libsvm.jar:lib/log4j.jar:lib/maltparser-1.7.1.jar:lib/weka.jar:dist/lib/maltlibweka.jar
+
 ## training part
-java -jar $THEJAR -l $LEARNER -weka $WEKACLASSIFIER -c $MODELNAME -i training/$LANG_SIZE.conll -m learn -f /home/alex/svn/parsing-qual/options.xml > trainingoutput
+java -cp $CLASSPATH org.maltparser.Malt \
+  -l $LEARNER \
+  -weka $WEKACLASSIFIER \
+  -c $MODELNAME \
+  -i training/$LANG_SIZE.conll \
+  -m learn \
+  > trainingoutput
 
 ## testing part
 echo "OK NOW TESTING."
-java -jar $THEJAR -c $MODELNAME -i $TESTSET -m parse -o $OUTFILE -f /home/alex/svn/parsing-qual/options.xml > testingoutput
+java -cp $CLASSPATH org.maltparser.Malt \
+  -c $MODELNAME \
+  -i $TESTSET \
+  -m parse \
+  -o $OUTFILE \
+  > testingoutput
 
 ## evaluate.
 echo "OK NOW EVALUATING."
