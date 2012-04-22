@@ -1,0 +1,9 @@
+These files describe the features that get fed to the classifiers, for the
+specific MaltParser Lib (libweka, in this case), for a given parsing algorithm.
+For more details please see:
+
+http://www.maltparser.org/userguide.html#featurespec
+
+The specifics of how this is loaded are described in options.xml; to get these
+feature files and the specific options.xml loaded into your MaltParser jar, use
+the "updatemalt" target in the ant build script at the top of this repository.
