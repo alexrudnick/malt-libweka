@@ -8,7 +8,7 @@ import org.maltparser.ml.lib.MaltLibModel;
 
 import weka.classifiers.Classifier;
 import weka.core.Attribute;
-import weka.core.DenseInstance;
+import weka.core.FastVector;
 import weka.core.Instance;
 import weka.core.Instances;
 
@@ -36,23 +36,23 @@ public class MaltLibWekaModel implements Serializable, MaltLibModel {
 	 */
 	@Override
 	public int[] predict(MaltFeatureNode[] x) {
-		ArrayList<Attribute> attinfo = new ArrayList<Attribute>();
+		FastVector attinfo = new FastVector();
 
 		for (int featnum = 0; featnum < x.length; featnum++) {
 			// We've decided that names of features start at 1; the names come
 			// from their column numbers in the .ins file that we read them from
 			// during training.
 			Attribute e = new Attribute("" + (featnum + 1));
-			attinfo.add(e);
+			attinfo.insertElementAt(e, featnum);
 		}
 
-		ArrayList<String> possibleClasses = new ArrayList<String>();
+		FastVector possibleClasses = new FastVector();
 		for (int cn = 0; cn < classUpperBound; cn++) {
-			possibleClasses.add("" + cn);
+			possibleClasses.insertElementAt("" + cn, cn);
 		}
 
 		Attribute classAttribute = new Attribute("class", possibleClasses);
-		attinfo.add(classAttribute);
+		attinfo.insertElementAt(classAttribute, x.length);
 
 		Instances instances = new Instances("MaltFeatures", attinfo, 0);
 		instances.setClass(classAttribute);
@@ -81,7 +81,7 @@ public class MaltLibWekaModel implements Serializable, MaltLibModel {
 	 * @return
 	 */
 	private static Instance featuresToInstance(MaltFeatureNode[] features) {
-		DenseInstance out = new DenseInstance(features.length + 1);
+		Instance out = new Instance(features.length + 1);
 		for (int i = 0; i < features.length; i++) {
 			MaltFeatureNode mfn = features[i];
 			out.setValue(i, mfn.getValue());

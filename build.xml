@@ -2,7 +2,7 @@
     <path id="malt-libweka.classpath">
         <pathelement location="bin"/>
         <pathelement location="lib/maltparser-1.7.1.jar"/>
-        <pathelement location="lib/weka.jar"/>
+        <pathelement location="lib/weka-3.6.6.jar"/>
         <pathelement location="lib/log4j.jar"/>
         <pathelement location="lib/libsvm.jar"/>
     </path>
@@ -18,7 +18,7 @@
     </target>
 
     <target name="compile" depends="init" description="compile the source " >
-        <javac destdir="${build}">
+        <javac debug="on" debuglevel="lines,vars,source" destdir="${build}">
                 <src path="src"/>
                 <classpath refid="malt-libweka.classpath"/>
         </javac>

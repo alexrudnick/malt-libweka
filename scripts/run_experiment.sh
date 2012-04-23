@@ -25,7 +25,7 @@ MODELNAME=$EXPNAME
 OUTFILE=$EXPNAME"_outfile.conll"
 RESULTS="results/"$EXPNAME".results"
 
-CLASSPATH=lib/libsvm.jar:lib/log4j.jar:lib/maltparser-1.7.1.jar:lib/weka.jar:dist/lib/maltlibweka.jar
+CLASSPATH=lib/libsvm.jar:lib/log4j.jar:lib/maltparser-1.7.1.jar:lib/weka-3.6.6.jar:dist/lib/maltlibweka.jar
 
 ## training part
 java -cp $CLASSPATH org.maltparser.Malt \

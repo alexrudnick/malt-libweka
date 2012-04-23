@@ -26,7 +26,7 @@ import org.maltparser.parser.history.action.SingleDecision;
 
 import weka.classifiers.Classifier;
 import weka.core.Attribute;
-import weka.core.DenseInstance;
+import weka.core.FastVector;
 import weka.core.Instance;
 import weka.core.Instances;
 
@@ -93,6 +93,7 @@ public class LibWeka extends Lib {
 					.getGuide().getConfiguration()
 					.getOptionValue("libweka", "classifier");
 			Classifier classifier = classifierClass.newInstance();
+			classifier.setOptions(null);
 			classifier.buildClassifier(instances);
 			ObjectOutputStream output = new ObjectOutputStream(
 					new BufferedOutputStream(new FileOutputStream(getFile(
@@ -130,14 +131,14 @@ public class LibWeka extends Lib {
 	private Instances buildWekaInstances(InputStreamReader isr)
 			throws MaltChainedException {
 		try {
-			ArrayList<Attribute> attinfo = new ArrayList<Attribute>();
+			FastVector attinfo = new FastVector();
 			final BufferedReader fp = new BufferedReader(isr);
 			Instances out = null;
 			int nWekaFeatures = -1;
 
-			ArrayList<String> possibleClasses = new ArrayList<String>();
+			FastVector possibleClasses = new FastVector();
 			for (int cn = 0; cn < getClassUpperBound(); cn++) {
-				possibleClasses.add("" + cn);
+				possibleClasses.insertElementAt("" + cn, cn);
 			}
 
 			for (int i = 0;; i++) {
@@ -152,7 +153,7 @@ public class LibWeka extends Lib {
 				if (i == 0) {
 					for (int featnum = 1; featnum < columns.length; featnum++) {
 						Attribute e = new Attribute("" + featnum);
-						attinfo.add(e);
+						attinfo.insertElementAt(e, featnum - 1);
 
 						// we have to fill in the featureMap.
 						// (be able to explain this...)
@@ -160,17 +161,17 @@ public class LibWeka extends Lib {
 					}
 					Attribute classAttribute = new Attribute("class",
 							possibleClasses);
-					attinfo.add(classAttribute);
+					attinfo.insertElementAt(classAttribute, columns.length - 1);
 					out = new Instances("MaltFeatures", attinfo, 0);
 					out.setClass(classAttribute);
 					nWekaFeatures = attinfo.size();
 				}
 
 				// fill in the weka instance to add into the training data.
-				Instance instance = new DenseInstance(nWekaFeatures);
+				Instance instance = new Instance(nWekaFeatures);
 				instance.setDataset(out);
 				for (int featnum = 1; featnum < nWekaFeatures; featnum++) {
-					Attribute att = attinfo.get(featnum - 1);
+					Attribute att = (Attribute) attinfo.elementAt(featnum - 1);
 					instance.setValue(att, Integer.parseInt(columns[featnum]));
 				}
 				instance.setClassValue(instanceClass);
