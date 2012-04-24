@@ -478,5 +478,10 @@ otherwise all tokens in Left must be inspected before the next token is shifted.
 			<legalvalue name="logistic" class="weka.classifiers.functions.Logistic">logistic</legalvalue>
 			<legalvalue name="multilayer" class="weka.classifiers.functions.MultilayerPerceptron">multilayer perceptron</legalvalue>
 		</option>
+		<option type="string" name="wekaopts" flag="wekaopts" default=""  usage="save">
+			<desc><![CDATA[Option flags to pass to the weka classifier.
+                        Which ones are possible depends on the classifier.]]></desc>
+			<shortdesc>Options to pass to the weka classifier.</shortdesc>
+		</option>
 	</optiongroup>
 </options>

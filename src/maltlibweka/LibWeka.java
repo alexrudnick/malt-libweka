@@ -107,9 +107,13 @@ public class LibWeka extends Lib {
 		    .getGuide().getConfiguration()
 		    .getOptionValue("libweka", "classifier");
 	    Classifier classifier = classifierClass.newInstance();
+
+	    String optstring = owner.getGuide().getConfiguration()
+		    .getOptionValueString("libweka", "wekaopts");
+	    String[] wekaopts = optstring.split(" ");
 	    // XXX(alexr): set classifier options here, get them from the
 	    // command line.
-	    // classifier.setOptions(null);
+	    classifier.setOptions(wekaopts);
 	    classifier.buildClassifier(instances);
 	    ObjectOutputStream output = new ObjectOutputStream(
 		    new BufferedOutputStream(new FileOutputStream(getFile(
@@ -167,13 +171,13 @@ public class LibWeka extends Lib {
 	    for (int cn = 0; cn < getClassUpperBound(); cn++) {
 		possibleClasses.addElement("" + cn);
 	    }
-	    Attribute classAttribute = new Attribute("CLASS", possibleClasses);	    
+	    Attribute classAttribute = new Attribute("CLASS", possibleClasses);
 	    attinfo.addElement(classAttribute);
-	    
+
 	    out = new Instances("MaltFeatures", attinfo, 0);
 	    out.setClass(classAttribute);
 	    nWekaFeatures = attinfo.size();
-	    while(true) {
+	    while (true) {
 		String line = fp.readLine();
 		if (line == null)
 		    break;
