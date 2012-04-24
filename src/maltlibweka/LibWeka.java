@@ -107,10 +107,9 @@ public class LibWeka extends Lib {
 		    .getGuide().getConfiguration()
 		    .getOptionValue("libweka", "classifier");
 	    Classifier classifier = classifierClass.newInstance();
-	    classifier.setOptions(null);
-
-	    System.out.println(nominalMap.get("1").size());
-	    
+	    // XXX(alexr): set classifier options here, get them from the
+	    // command line.
+	    // classifier.setOptions(null);
 	    classifier.buildClassifier(instances);
 	    ObjectOutputStream output = new ObjectOutputStream(
 		    new BufferedOutputStream(new FileOutputStream(getFile(
@@ -154,9 +153,27 @@ public class LibWeka extends Lib {
 	    int nWekaFeatures = -1;
 
 	    Map<String, FastVector> themap = getNominalMap();
-	    FastVector possibleClasses = themap.get("CLASS");
+	    for (int featnum = 1; featnum < themap.keySet().size(); featnum++) {
+		String featname = "" + featnum;
+		// All attributes here are nominal now.
+		Attribute e = new Attribute(featname, themap.get(featname));
+		attinfo.addElement(e);
 
-	    for (int i = 0;; i++) {
+		// we have to fill in the featureMap.
+		// XXX(alexr): be able to explain this...
+		featureMap.addIndex(featnum, featnum - 1);
+	    }
+	    FastVector possibleClasses = new FastVector();
+	    for (int cn = 0; cn < getClassUpperBound(); cn++) {
+		possibleClasses.addElement("" + cn);
+	    }
+	    Attribute classAttribute = new Attribute("CLASS", possibleClasses);	    
+	    attinfo.addElement(classAttribute);
+	    
+	    out = new Instances("MaltFeatures", attinfo, 0);
+	    out.setClass(classAttribute);
+	    nWekaFeatures = attinfo.size();
+	    while(true) {
 		String line = fp.readLine();
 		if (line == null)
 		    break;
@@ -164,33 +181,12 @@ public class LibWeka extends Lib {
 		String[] columns = tabPattern.split(line);
 		String instanceClass = columns[0];
 
-		// on the first iteration, build the weka dataset.
-		if (i == 0) {
-		    for (int featnum = 1; featnum < columns.length; featnum++) {
-			String featname = "" + featnum;
-			// All attributes here are nominal now. I hope that's OK.
-			Attribute e = new Attribute(featname,
-				themap.get(featname));
-			attinfo.addElement(e);
-
-			// we have to fill in the featureMap.
-			// (be able to explain this...)
-			featureMap.addIndex(featnum, featnum - 1);
-		    }
-		    Attribute classAttribute = new Attribute("class",
-			    possibleClasses);
-		    attinfo.addElement(classAttribute);
-		    out = new Instances("MaltFeatures", attinfo, 0);
-		    out.setClass(classAttribute);
-		    nWekaFeatures = attinfo.size();
-		}
-
 		// fill in the weka instance to add into the training data.
 		Instance instance = new Instance(nWekaFeatures);
 		instance.setDataset(out);
 		for (int featnum = 1; featnum < nWekaFeatures; featnum++) {
 		    Attribute att = (Attribute) attinfo.elementAt(featnum - 1);
-		    instance.setValue(att, Integer.parseInt(columns[featnum]));
+		    instance.setValue(att, columns[featnum]);
 		}
 		instance.setClassValue(instanceClass);
 		out.add(instance);

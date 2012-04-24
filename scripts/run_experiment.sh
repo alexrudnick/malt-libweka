@@ -28,7 +28,8 @@ RESULTS="results/"$EXPNAME".results"
 CLASSPATH=lib/libsvm.jar:lib/log4j.jar:lib/maltparser-1.7.1.jar:lib/weka-3.6.6.jar:dist/lib/maltlibweka.jar
 
 ## training part
-java -cp $CLASSPATH org.maltparser.Malt \
+java -Xmx4096m \
+  -cp $CLASSPATH org.maltparser.Malt \
   -l $LEARNER \
   -weka $WEKACLASSIFIER \
   -c $MODELNAME \
@@ -38,7 +39,8 @@ java -cp $CLASSPATH org.maltparser.Malt \
 
 ## testing part
 echo "OK NOW TESTING."
-java -cp $CLASSPATH org.maltparser.Malt \
+java -Xmx4096m \
+  -cp $CLASSPATH org.maltparser.Malt \
   -c $MODELNAME \
   -i $TESTSET \
   -m parse \
