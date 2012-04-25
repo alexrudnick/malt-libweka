@@ -111,8 +111,6 @@ public class LibWeka extends Lib {
 	    String optstring = owner.getGuide().getConfiguration()
 		    .getOptionValueString("libweka", "wekaopts");
 	    String[] wekaopts = optstring.split(" ");
-	    // XXX(alexr): set classifier options here, get them from the
-	    // command line.
 	    classifier.setOptions(wekaopts);
 	    classifier.buildClassifier(instances);
 	    ObjectOutputStream output = new ObjectOutputStream(
