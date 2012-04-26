@@ -66,6 +66,7 @@ public class MaltLibWekaModel implements Serializable, MaltLibModel {
 	    instances = classifierSpecificHacks(instances);
 	    prediction = classifier.classifyInstance(instances.firstInstance());
 	    instances.delete();
+	    save_instances.delete();
 	} catch (Exception e) {
 	    e.printStackTrace();
 	    System.exit(1);
@@ -152,14 +153,14 @@ public class MaltLibWekaModel implements Serializable, MaltLibModel {
 
 	for (int i = 0; i < attInfoPostHacks.size(); i++) {
 	    Attribute binAttribute = (Attribute) attInfoPostHacks.elementAt(i);
-	    System.out.println(binAttribute.name());
-	    String[] splitted = binAttribute.name().split("=");
-	    if (splitted[0].equals("CLASS"))
+	    if (binAttribute.name().equals("CLASS"))
 		continue;
+	    String[] splitted = binAttribute.name().split("=");
 	    // names of attributes start at 1.
 	    int field = Integer.parseInt(splitted[0]) - 1;
 	    String val = splitted[1];
-	    binarized.setValue(i, (nominal.stringValue(field) == val) ? 1 : 0);
+	    binarized.setValue(i, nominal.stringValue(field).equals(val) ? 1
+		    : 0);
 	}
 	binarized.setDataset(out);
 	out.add(binarized);
