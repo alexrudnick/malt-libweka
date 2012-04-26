@@ -216,7 +216,7 @@ public class LibWeka extends Lib {
 	BestFirst attributeSearch = new BestFirst();
 	// XXX(alexr): magic start set
 	attributeSearch.setStartSet("1-10");
-	attributeSearch.setDirection(null);
+	// attributeSearch.setDirection(null);
 	attributeSearch.setSearchTermination(1);
 
 	attributeSelection.setSearch(attributeSearch);

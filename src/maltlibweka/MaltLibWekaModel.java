@@ -140,21 +140,30 @@ public class MaltLibWekaModel implements Serializable, MaltLibModel {
      * @return
      * @throws Exception
      */
-    private Instances binarizeAndFilter(Instances instances) throws Exception {
+    private Instances binarizeAndFilter(Instances nominals) throws Exception {
 	// XXX(alexr): The thing to do here is parse the names of the
 	// attributes, isn't it? We're going to go through the attInfoPostHacks
 	// and compute each one separately, yeahhh!!
 
-	NominalToBinary nominalToBinary = new NominalToBinary();
-	nominalToBinary.setInputFormat(instances);
-	instances = Filter.useFilter(instances, nominalToBinary);
-	for (int i = instances.numAttributes() - 1; i >= 0; i--) {
-	    if (!attInfoPostHacks.contains(instances.attribute(i))) {
-		if (instances.classAttribute() != instances.attribute(i)) {
-		    instances.deleteAttributeAt(i);
-		}
-	    }
+	Instances out = new Instances("MaltFeatures", attInfoPostHacks, 0);
+	out.setClassIndex(out.numAttributes() - 1);
+	Instance nominal = nominals.firstInstance();
+	Instance binarized = new Instance(attInfoPostHacks.size());
+
+	for (int i = 0; i < attInfoPostHacks.size(); i++) {
+	    Attribute binAttribute = (Attribute) attInfoPostHacks.elementAt(i);
+	    System.out.println(binAttribute.name());
+	    String[] splitted = binAttribute.name().split("=");
+	    if (splitted[0].equals("CLASS"))
+		continue;
+	    // names of attributes start at 1.
+	    int field = Integer.parseInt(splitted[0]) - 1;
+	    String val = splitted[1];
+	    binarized.setValue(i, (nominal.stringValue(field) == val) ? 1 : 0);
 	}
-	return instances;
+	binarized.setDataset(out);
+	out.add(binarized);
+	binarized.setClassValue((String) nominalMap.get("CLASS").elementAt(0));
+	return out;
     }
 }
