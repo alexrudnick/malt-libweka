@@ -7,7 +7,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -27,8 +26,9 @@ import org.maltparser.ml.lib.MaltLibModel;
 import org.maltparser.parser.guide.instance.InstanceModel;
 import org.maltparser.parser.history.action.SingleDecision;
 
-import weka.attributeSelection.BestFirst;
 import weka.attributeSelection.CfsSubsetEval;
+import weka.attributeSelection.CostSensitiveSubsetEval;
+import weka.attributeSelection.RankSearch;
 import weka.attributeSelection.Ranker;
 import weka.classifiers.Classifier;
 import weka.classifiers.functions.Logistic;
@@ -36,7 +36,6 @@ import weka.core.Attribute;
 import weka.core.FastVector;
 import weka.core.Instance;
 import weka.core.Instances;
-import weka.core.SelectedTag;
 import weka.filters.Filter;
 import weka.filters.supervised.attribute.AttributeSelection;
 import weka.filters.supervised.attribute.NominalToBinary;
@@ -202,25 +201,12 @@ public class LibWeka extends Lib {
 	System.out.println("num attributes: " + instances.numAttributes());
 	
 	// XXX(alexr): this way too slow. How do we make it faster?
-
-//	weka.attributeSelection.AttributeSelection attsel = new weka.attributeSelection.AttributeSelection();
-//	Ranker search = new Ranker();
-//	attsel.setSearch(search);
-//	attsel.SelectAttributes(instances);
-//	int[] indices = attsel.selectedAttributes();
-//	System.out.println("the 10 best attributes: " + indices);
-
 	AttributeSelection attributeSelection = new AttributeSelection();
-	// LinearForwardSelection attributeSearch = new
-	// LinearForwardSelection();
-	BestFirst attributeSearch = new BestFirst();
-	// XXX(alexr): magic start set
-	attributeSearch.setStartSet("1-10");
-	// attributeSearch.setDirection(null);
-	attributeSearch.setSearchTermination(1);
-
+	RankSearch attributeSearch = new RankSearch();
+	CfsSubsetEval evaluator = new CfsSubsetEval();
 	attributeSelection.setSearch(attributeSearch);
 	attributeSelection.setInputFormat(instances);
+	attributeSelection.setEvaluator(evaluator);
 	instances = Filter.useFilter(instances, attributeSelection);
 	System.out.println("num attributes: " + instances.numAttributes());
 	return instances;
