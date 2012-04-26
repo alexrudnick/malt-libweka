@@ -1,7 +1,6 @@
 package maltlibweka;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Map;
 
 import org.maltparser.ml.lib.MaltFeatureNode;
@@ -25,12 +24,12 @@ public class MaltLibWekaModel implements Serializable, MaltLibModel {
     // have to construct it over and over again.
     private Instances save_instances = null;
 
+    private int classUpperBound;
     // attributes for weka instances, before feature binarization.
-    private FastVector save_attinfo = null;
-
+    private FastVector attInfoBeforeHacks;
     // attributes for weka instances, what was actually used to train the
     // classifier.
-    private ArrayList<Attribute> actualAttinfo;
+    private FastVector attInfoPostHacks;
 
     /**
      * Construct a MaltLibWekaModel with the specified weka classifier and
@@ -39,13 +38,17 @@ public class MaltLibWekaModel implements Serializable, MaltLibModel {
      * 
      * @param classifier
      * @param attinfo
-     * @param map
+     * @param attinfoPostHacks
+     * @param nomMap
      */
     public MaltLibWekaModel(Classifier classifier,
-	    ArrayList<Attribute> attinfo, Map<String, FastVector> map) {
+	    FastVector attinfoBeforeHacks, FastVector attinfoPostHacks,
+	    Map<String, FastVector> nomMap, int classUpperBound) {
 	this.classifier = classifier;
-	this.nominalMap = map;
-	this.actualAttinfo = attinfo;
+	this.nominalMap = nomMap;
+	this.attInfoBeforeHacks = attinfoBeforeHacks;
+	this.attInfoPostHacks = attinfoPostHacks;
+	this.classUpperBound = classUpperBound;
     }
 
     /**
@@ -57,55 +60,39 @@ public class MaltLibWekaModel implements Serializable, MaltLibModel {
 	double prediction = 0;
 	try {
 	    Instances instances = getInstances(x);
-	    Instance instance = featuresToInstance(x, getAttInfo(x), instances);
-	    instance.setDataset(instances);
-	    instances.add(instance);
-
+	    Instance instance = featuresToInstance(x, attInfoBeforeHacks);
 	    // We may need to mangle the attributes to match the attributes in
 	    // the classifier.
 	    instances = classifierSpecificHacks(instances);
 	    prediction = classifier.classifyInstance(instances.firstInstance());
+	    instances.delete();
 	} catch (Exception e) {
 	    e.printStackTrace();
 	    System.exit(1);
 	}
-	FastVector possibleClasses = nominalMap.get("CLASS");
-	int[] out = new int[possibleClasses.size()];
-	for (int i = 0; i < possibleClasses.size(); i++) {
+	int[] out = new int[classUpperBound];
+	for (int i = 0; i < classUpperBound; i++) {
 	    out[i] = (int) prediction;
 	}
 	return out;
     }
 
+    /**
+     * Create the weka Instances object that we'll use to hold our weka
+     * instances, then classify them. Has to know about the appropriate
+     * attributes. We may mangle these.
+     * 
+     * @param x
+     * @return
+     */
     private Instances getInstances(MaltFeatureNode[] x) {
-	// TODO Auto-generated method stub
-	if (this.save_instances != null) {
-	    return this.save_instances;
+	if (save_instances != null) {
+	    return save_instances;
 	}
-	this.save_instances = new Instances("MaltFeatures", getAttInfo(x), 0);
-	FastVector attinfo = getAttInfo(x);
-	FastVector possibleClasses = nominalMap.get("CLASS");
-	Attribute classAttribute = new Attribute("CLASS", possibleClasses);
-	attinfo.addElement(classAttribute);
-	save_instances.setClass(classAttribute);
+	save_instances = new Instances("MaltFeatures", attInfoBeforeHacks, 0);
+	save_instances.setClass(save_instances.attribute(save_instances
+		.numAttributes() - 1));
 	return this.save_instances;
-    }
-
-    private FastVector getAttInfo(MaltFeatureNode[] x) {
-	if (this.save_attinfo != null) {
-	    return this.save_attinfo;
-	}
-	
-	this.save_attinfo = new FastVector();
-	for (int featnum = 0; featnum < x.length; featnum++) {
-	    // We've decided that names of features start at 1; the names come
-	    // from their column numbers in the .ins file that we read them from
-	    // during training.
-	    String featname = "" + (featnum + 1);
-	    Attribute e = new Attribute(featname, nominalMap.get(featname));
-	    save_attinfo.addElement(e);
-	}
-	return this.save_attinfo;
     }
 
     private Instances classifierSpecificHacks(Instances instances)
@@ -126,21 +113,22 @@ public class MaltLibWekaModel implements Serializable, MaltLibModel {
      * @return
      */
     private Instance featuresToInstance(MaltFeatureNode[] features,
-	    FastVector attinfo, Instances instances) {
+	    FastVector attinfo) {
 	Instance out = new Instance(features.length + 1);
+	Instances instances = getInstances(features);
 	out.setDataset(instances);
 	for (int i = 0; i < features.length; i++) {
 	    MaltFeatureNode mfn = features[i];
 	    Attribute att = (Attribute) attinfo.elementAt(i);
 	    String val = "" + Math.round(mfn.getValue());
-	    if (!nominalMap.get(att.name()).contains(val)) {
+	    FastVector vec = nominalMap.get(att.name());
+	    if (!vec.contains(val)) {
 		val = "OOV";
 	    }
-	    System.out.println("att: " + att);
-	    System.out.println("val: " + val);
 	    out.setValue(att, val);
 	}
 	out.setClassValue((String) nominalMap.get("CLASS").elementAt(0));
+	instances.add(out);
 	return out;
     }
 
@@ -153,11 +141,15 @@ public class MaltLibWekaModel implements Serializable, MaltLibModel {
      * @throws Exception
      */
     private Instances binarizeAndFilter(Instances instances) throws Exception {
+	// XXX(alexr): The thing to do here is parse the names of the
+	// attributes, isn't it? We're going to go through the attInfoPostHacks
+	// and compute each one separately, yeahhh!!
+
 	NominalToBinary nominalToBinary = new NominalToBinary();
 	nominalToBinary.setInputFormat(instances);
 	instances = Filter.useFilter(instances, nominalToBinary);
 	for (int i = instances.numAttributes() - 1; i >= 0; i--) {
-	    if (!actualAttinfo.contains(instances.attribute(i))) {
+	    if (!attInfoPostHacks.contains(instances.attribute(i))) {
 		if (instances.classAttribute() != instances.attribute(i)) {
 		    instances.deleteAttributeAt(i);
 		}
@@ -165,5 +157,4 @@ public class MaltLibWekaModel implements Serializable, MaltLibModel {
 	}
 	return instances;
     }
-
 }

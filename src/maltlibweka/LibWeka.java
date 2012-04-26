@@ -27,14 +27,16 @@ import org.maltparser.ml.lib.MaltLibModel;
 import org.maltparser.parser.guide.instance.InstanceModel;
 import org.maltparser.parser.history.action.SingleDecision;
 
-import weka.attributeSelection.GreedyStepwise;
-import weka.attributeSelection.LinearForwardSelection;
+import weka.attributeSelection.BestFirst;
+import weka.attributeSelection.CfsSubsetEval;
+import weka.attributeSelection.Ranker;
 import weka.classifiers.Classifier;
 import weka.classifiers.functions.Logistic;
 import weka.core.Attribute;
 import weka.core.FastVector;
 import weka.core.Instance;
 import weka.core.Instances;
+import weka.core.SelectedTag;
 import weka.filters.Filter;
 import weka.filters.supervised.attribute.AttributeSelection;
 import weka.filters.supervised.attribute.NominalToBinary;
@@ -116,9 +118,9 @@ public class LibWeka extends Lib {
 		    .getOptionValue("libweka", "classifier");
 	    Classifier classifier = classifierClass.newInstance();
 
+	    FastVector attinfoBeforeHacks = getAttInfo(instances);
 	    instances = classifierSpecificHacks(instances, classifier);
-	    
-	    ArrayList<Attribute> attinfo = getAttInfo(instances);
+	    FastVector attinfoPostHacks = getAttInfo(instances);
 
 	    String optstring = owner.getGuide().getConfiguration()
 		    .getOptionValueString("libweka", "wekaopts");
@@ -129,9 +131,8 @@ public class LibWeka extends Lib {
 		    new BufferedOutputStream(new FileOutputStream(getFile(
 			    ".moo").getAbsolutePath())));
 	    try {
-		output.writeObject(new MaltLibWekaModel(classifier,
-			attinfo,
-			getNominalMap()));
+		output.writeObject(new MaltLibWekaModel(classifier, attinfoBeforeHacks, attinfoPostHacks,
+			getNominalMap(), getClassUpperBound()));
 	    } finally {
 		output.close();
 	    }
@@ -161,13 +162,14 @@ public class LibWeka extends Lib {
 
     /**
      * We need a list of the Attributes for a given weka dataset.
+     * 
      * @param instances
      * @return
      */
-    private ArrayList<Attribute> getAttInfo(Instances instances) {
-	ArrayList<Attribute> out = new ArrayList<Attribute>();
+    private FastVector getAttInfo(Instances instances) {
+	FastVector out = new FastVector();
 	for (int i = 0; i < instances.numAttributes(); i++) {
-	    out.add(instances.attribute(i));
+	    out.addElement(instances.attribute(i));
 	}
 	return out;
     }
@@ -179,7 +181,7 @@ public class LibWeka extends Lib {
      * @param instances
      * @param classifier
      * @return
-     * @throws Exception 
+     * @throws Exception
      */
     private Instances classifierSpecificHacks(Instances instances,
 	    Classifier classifier) throws Exception {
@@ -187,39 +189,40 @@ public class LibWeka extends Lib {
 	if (classifier instanceof Logistic) {
 	    return binarizeAndFilter(instances);
 	}
-	
+
 	return instances;
     }
-    
+
     private Instances binarizeAndFilter(Instances instances) throws Exception {
 	System.out.println("num attributes: " + instances.numAttributes());
-	
+
 	NominalToBinary nominalToBinary = new NominalToBinary();
 	nominalToBinary.setInputFormat(instances);
 	instances = Filter.useFilter(instances, nominalToBinary);
 	System.out.println("num attributes: " + instances.numAttributes());
+	
+	// XXX(alexr): this way too slow. How do we make it faster?
+
+//	weka.attributeSelection.AttributeSelection attsel = new weka.attributeSelection.AttributeSelection();
+//	Ranker search = new Ranker();
+//	attsel.setSearch(search);
+//	attsel.SelectAttributes(instances);
+//	int[] indices = attsel.selectedAttributes();
+//	System.out.println("the 10 best attributes: " + indices);
 
 	AttributeSelection attributeSelection = new AttributeSelection();
+	// LinearForwardSelection attributeSearch = new
+	// LinearForwardSelection();
+	BestFirst attributeSearch = new BestFirst();
+	// XXX(alexr): magic start set
+	attributeSearch.setStartSet("1-10");
+	attributeSearch.setDirection(null);
+	attributeSearch.setSearchTermination(1);
 
-	LinearForwardSelection attributeSearch = new LinearForwardSelection();
-
-	// XXX(alexr): magic number
-	// attributeSearch.setNumToSelect(5);
-	attributeSearch.setSearchTermination(2);
-	
 	attributeSelection.setSearch(attributeSearch);
 	attributeSelection.setInputFormat(instances);
 	instances = Filter.useFilter(instances, attributeSelection);
 	System.out.println("num attributes: " + instances.numAttributes());
-	
-//	GreedyStepwise greedySearch = new GreedyStepwise();
-//	// XXX(alexr): magic number
-//	greedySearch.setNumToSelect(5);
-//	attributeSelection.setSearch(greedySearch);
-//	attributeSelection.setInputFormat(instances);
-//	instances = Filter.useFilter(instances, attributeSelection);
-//	System.out.println("num attributes: " + instances.numAttributes());
-	
 	return instances;
     }
 
