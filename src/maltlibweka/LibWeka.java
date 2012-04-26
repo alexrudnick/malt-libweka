@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -26,11 +27,17 @@ import org.maltparser.ml.lib.MaltLibModel;
 import org.maltparser.parser.guide.instance.InstanceModel;
 import org.maltparser.parser.history.action.SingleDecision;
 
+import weka.attributeSelection.GreedyStepwise;
+import weka.attributeSelection.LinearForwardSelection;
 import weka.classifiers.Classifier;
+import weka.classifiers.functions.Logistic;
 import weka.core.Attribute;
 import weka.core.FastVector;
 import weka.core.Instance;
 import weka.core.Instances;
+import weka.filters.Filter;
+import weka.filters.supervised.attribute.AttributeSelection;
+import weka.filters.supervised.attribute.NominalToBinary;
 
 /**
  * Extends MaltParser with parameterizable Weka classifiers. Extends the same
@@ -93,12 +100,13 @@ public class LibWeka extends Lib {
     protected void trainInternal(FeatureVector featureVector)
 	    throws MaltChainedException {
 	try {
-	    final Instances instances = buildWekaInstances(getInstanceInputStreamReader(".ins"));
 	    owner.getGuide()
 		    .getConfiguration()
 		    .getConfigLogger()
 		    .info("Creating LIBWEKA model " + getFile(".moo").getName()
 			    + "\n");
+
+	    Instances instances = buildWekaInstances(getInstanceInputStreamReader(".ins"));
 
 	    // Pull up an object of a type specified in the options.
 	    // Possible classes are defined in appdata/options.xml.
@@ -107,6 +115,10 @@ public class LibWeka extends Lib {
 		    .getGuide().getConfiguration()
 		    .getOptionValue("libweka", "classifier");
 	    Classifier classifier = classifierClass.newInstance();
+
+	    instances = classifierSpecificHacks(instances, classifier);
+	    
+	    ArrayList<Attribute> attinfo = getAttInfo(instances);
 
 	    String optstring = owner.getGuide().getConfiguration()
 		    .getOptionValueString("libweka", "wekaopts");
@@ -118,6 +130,7 @@ public class LibWeka extends Lib {
 			    ".moo").getAbsolutePath())));
 	    try {
 		output.writeObject(new MaltLibWekaModel(classifier,
+			attinfo,
 			getNominalMap()));
 	    } finally {
 		output.close();
@@ -144,6 +157,70 @@ public class LibWeka extends Lib {
 		    e);
 
 	}
+    }
+
+    /**
+     * We need a list of the Attributes for a given weka dataset.
+     * @param instances
+     * @return
+     */
+    private ArrayList<Attribute> getAttInfo(Instances instances) {
+	ArrayList<Attribute> out = new ArrayList<Attribute>();
+	for (int i = 0; i < instances.numAttributes(); i++) {
+	    out.add(instances.attribute(i));
+	}
+	return out;
+    }
+
+    /**
+     * Modifies the weka dataset based on specific knowledge we have about the
+     * classifier. This is kind of terrible, but we're going to do it anyway.
+     * 
+     * @param instances
+     * @param classifier
+     * @return
+     * @throws Exception 
+     */
+    private Instances classifierSpecificHacks(Instances instances,
+	    Classifier classifier) throws Exception {
+
+	if (classifier instanceof Logistic) {
+	    return binarizeAndFilter(instances);
+	}
+	
+	return instances;
+    }
+    
+    private Instances binarizeAndFilter(Instances instances) throws Exception {
+	System.out.println("num attributes: " + instances.numAttributes());
+	
+	NominalToBinary nominalToBinary = new NominalToBinary();
+	nominalToBinary.setInputFormat(instances);
+	instances = Filter.useFilter(instances, nominalToBinary);
+	System.out.println("num attributes: " + instances.numAttributes());
+
+	AttributeSelection attributeSelection = new AttributeSelection();
+
+	LinearForwardSelection attributeSearch = new LinearForwardSelection();
+
+	// XXX(alexr): magic number
+	// attributeSearch.setNumToSelect(5);
+	attributeSearch.setSearchTermination(2);
+	
+	attributeSelection.setSearch(attributeSearch);
+	attributeSelection.setInputFormat(instances);
+	instances = Filter.useFilter(instances, attributeSelection);
+	System.out.println("num attributes: " + instances.numAttributes());
+	
+//	GreedyStepwise greedySearch = new GreedyStepwise();
+//	// XXX(alexr): magic number
+//	greedySearch.setNumToSelect(5);
+//	attributeSelection.setSearch(greedySearch);
+//	attributeSelection.setInputFormat(instances);
+//	instances = Filter.useFilter(instances, attributeSelection);
+//	System.out.println("num attributes: " + instances.numAttributes());
+	
+	return instances;
     }
 
     private Instances buildWekaInstances(InputStreamReader isr)
