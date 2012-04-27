@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.util.BitSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -26,19 +27,21 @@ import org.maltparser.ml.lib.MaltLibModel;
 import org.maltparser.parser.guide.instance.InstanceModel;
 import org.maltparser.parser.history.action.SingleDecision;
 
+import weka.attributeSelection.BestFirst;
 import weka.attributeSelection.CfsSubsetEval;
-import weka.attributeSelection.CostSensitiveSubsetEval;
+import weka.attributeSelection.LinearForwardSelection;
 import weka.attributeSelection.RankSearch;
-import weka.attributeSelection.Ranker;
 import weka.classifiers.Classifier;
 import weka.classifiers.functions.Logistic;
 import weka.core.Attribute;
 import weka.core.FastVector;
 import weka.core.Instance;
 import weka.core.Instances;
+import weka.core.SelectedTag;
 import weka.filters.Filter;
 import weka.filters.supervised.attribute.AttributeSelection;
 import weka.filters.supervised.attribute.NominalToBinary;
+import weka.filters.unsupervised.attribute.RemoveUseless;
 
 /**
  * Extends MaltParser with parameterizable Weka classifiers. Extends the same
@@ -130,8 +133,9 @@ public class LibWeka extends Lib {
 		    new BufferedOutputStream(new FileOutputStream(getFile(
 			    ".moo").getAbsolutePath())));
 	    try {
-		output.writeObject(new MaltLibWekaModel(classifier, attinfoBeforeHacks, attinfoPostHacks,
-			getNominalMap(), getClassUpperBound()));
+		output.writeObject(new MaltLibWekaModel(classifier,
+			attinfoBeforeHacks, attinfoPostHacks, getNominalMap(),
+			getClassUpperBound()));
 	    } finally {
 		output.close();
 	    }
@@ -193,23 +197,54 @@ public class LibWeka extends Lib {
     }
 
     private Instances binarizeAndFilter(Instances instances) throws Exception {
-	System.out.println("num attributes: " + instances.numAttributes());
+	System.out.println("num attributes initially: " + instances.numAttributes());
+	
+	instances = filterAttributes(instances, 10);
+	System.out.println("num attributes after feature selection: " + instances.numAttributes());
 
 	NominalToBinary nominalToBinary = new NominalToBinary();
 	nominalToBinary.setInputFormat(instances);
 	instances = Filter.useFilter(instances, nominalToBinary);
-	System.out.println("num attributes: " + instances.numAttributes());
+	System.out.println("num attributes after binarization: " + instances.numAttributes());
 	
+	RemoveUseless remuseless = new RemoveUseless();
+	remuseless.setInputFormat(instances);
+	instances = Filter.useFilter(instances, remuseless);
+	System.out.println("num attributes after RemoveUseless: " + instances.numAttributes());
+	
+	instances = filterAttributes(instances, 10);
+	System.out.println("num attributes at the end: " + instances.numAttributes());
+
+	return instances;
+    }
+
+    private Instances filterAttributes(Instances instances, final int maxAttributes)
+	    throws Exception {
+	LinearForwardSelection lfs = new LinearForwardSelection();
+	lfs.setType(new SelectedTag(0, LinearForwardSelection.TAGS_TYPE));
+	lfs.setNumUsedAttributes(maxAttributes);
+	lfs.setSearchTermination(1);
+	CfsSubsetEval evaluator = new CfsSubsetEval() {
+	    private static final long serialVersionUID = 4256412140715016639L;
+
+	    @Override
+	    public double evaluateSubset(BitSet subset) throws Exception {
+		double out = super.evaluateSubset(subset);
+		if (subset.cardinality() < maxAttributes) {
+		    return out;
+		} else {
+		    System.out.println("ZERO!");
+		    return 0;
+		}
+	    }
+	};
 	// XXX(alexr): this way too slow. How do we make it faster?
 	AttributeSelection attributeSelection = new AttributeSelection();
-	RankSearch attributeSearch = new RankSearch();
-	CfsSubsetEval evaluator = new CfsSubsetEval();
-	attributeSelection.setSearch(attributeSearch);
+	attributeSelection.setSearch(lfs);
 	attributeSelection.setInputFormat(instances);
 	attributeSelection.setEvaluator(evaluator);
-	instances = Filter.useFilter(instances, attributeSelection);
-	System.out.println("num attributes: " + instances.numAttributes());
-	return instances;
+	Instances out = Filter.useFilter(instances, attributeSelection);
+	return out;
     }
 
     private Instances buildWekaInstances(InputStreamReader isr)
