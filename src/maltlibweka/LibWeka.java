@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -27,10 +28,9 @@ import org.maltparser.ml.lib.MaltLibModel;
 import org.maltparser.parser.guide.instance.InstanceModel;
 import org.maltparser.parser.history.action.SingleDecision;
 
-import weka.attributeSelection.BestFirst;
 import weka.attributeSelection.CfsSubsetEval;
 import weka.attributeSelection.LinearForwardSelection;
-import weka.attributeSelection.RankSearch;
+import weka.attributeSelection.SubsetSizeForwardSelection;
 import weka.classifiers.Classifier;
 import weka.classifiers.functions.Logistic;
 import weka.core.Attribute;
@@ -52,12 +52,18 @@ import weka.filters.unsupervised.attribute.RemoveUseless;
  */
 public class LibWeka extends Lib {
 
+    public static final String OOV = "OOV";
+
     /**
      * The largest number for a class.
      */
     private int classUpperBound = 0;
 
     private Map<String, FastVector> nominalMap = null;
+
+    private ArrayList<HashMap<String, Integer>> save_attributeValueCounts;
+
+    private Integer minValueCount = 5;
 
     public LibWeka(InstanceModel owner, Integer learnerMode)
 	    throws MaltChainedException {
@@ -111,7 +117,8 @@ public class LibWeka extends Lib {
 			    + "\n");
 
 	    Instances instances = buildWekaInstances(getInstanceInputStreamReader(".ins"));
-
+	    System.out.println("got instances");
+	    
 	    // Pull up an object of a type specified in the options.
 	    // Possible classes are defined in appdata/options.xml.
 	    @SuppressWarnings("unchecked")
@@ -123,12 +130,19 @@ public class LibWeka extends Lib {
 	    FastVector attinfoBeforeHacks = getAttInfo(instances);
 	    instances = classifierSpecificHacks(instances, classifier);
 	    FastVector attinfoPostHacks = getAttInfo(instances);
+	    System.out.println("specific hacks done");
+	    
 
 	    String optstring = owner.getGuide().getConfiguration()
 		    .getOptionValueString("libweka", "wekaopts");
 	    String[] wekaopts = optstring.split(" ");
 	    classifier.setOptions(wekaopts);
+	    
+	    System.out.println("training classifier...");
+	    System.out.println("num instances: " + instances.numInstances());
+	    System.out.println("num attributes: " + instances.numAttributes());
 	    classifier.buildClassifier(instances);
+	    System.out.println("trained classifier.");
 	    ObjectOutputStream output = new ObjectOutputStream(
 		    new BufferedOutputStream(new FileOutputStream(getFile(
 			    ".moo").getAbsolutePath())));
@@ -159,7 +173,6 @@ public class LibWeka extends Lib {
 	    e.printStackTrace();
 	    throw new LibException("The Weka learner broke in some other way",
 		    e);
-
 	}
     }
 
@@ -197,52 +210,47 @@ public class LibWeka extends Lib {
     }
 
     private Instances binarizeAndFilter(Instances instances) throws Exception {
-	System.out.println("num attributes initially: " + instances.numAttributes());
-	
-	instances = filterAttributes(instances, 10);
-	System.out.println("num attributes after feature selection: " + instances.numAttributes());
-
+	System.out.println("num attributes initially: "
+		+ instances.numAttributes());
 	NominalToBinary nominalToBinary = new NominalToBinary();
 	nominalToBinary.setInputFormat(instances);
 	instances = Filter.useFilter(instances, nominalToBinary);
-	System.out.println("num attributes after binarization: " + instances.numAttributes());
-	
-	RemoveUseless remuseless = new RemoveUseless();
-	remuseless.setInputFormat(instances);
-	instances = Filter.useFilter(instances, remuseless);
-	System.out.println("num attributes after RemoveUseless: " + instances.numAttributes());
-	
-	instances = filterAttributes(instances, 10);
-	System.out.println("num attributes at the end: " + instances.numAttributes());
-
+	System.out.println("num attributes after binarization: "
+		+ instances.numAttributes());
+	instances = filterAttributes(instances, 100);
+	System.out.println("num attributes at the end: "
+		+ instances.numAttributes());
 	return instances;
     }
 
-    private Instances filterAttributes(Instances instances, final int maxAttributes)
-	    throws Exception {
+    private Instances filterAttributes(Instances instances,
+	    final int maxAttributes) throws Exception {
 	LinearForwardSelection lfs = new LinearForwardSelection();
 	lfs.setType(new SelectedTag(0, LinearForwardSelection.TAGS_TYPE));
 	lfs.setNumUsedAttributes(maxAttributes);
-	lfs.setSearchTermination(1);
-	CfsSubsetEval evaluator = new CfsSubsetEval() {
-	    private static final long serialVersionUID = 4256412140715016639L;
-
-	    @Override
-	    public double evaluateSubset(BitSet subset) throws Exception {
-		double out = super.evaluateSubset(subset);
-		if (subset.cardinality() < maxAttributes) {
-		    return out;
-		} else {
-		    System.out.println("ZERO!");
-		    return 0;
-		}
-	    }
-	};
+	lfs.setSearchTermination(5);
+//	CfsSubsetEval evaluator = new CfsSubsetEval() {
+//	    private static final long serialVersionUID = 4256412140715016639L;
+//
+//	    @Override
+//	    public double evaluateSubset(BitSet subset) throws Exception {
+//		double out = super.evaluateSubset(subset);
+//		if (subset.cardinality() < maxAttributes) {
+//		    return out;
+//		} else {
+//		    System.out.println("ZERO!");
+//		    return 0;
+//		}
+//	    }
+//	};
 	// XXX(alexr): this way too slow. How do we make it faster?
+	SubsetSizeForwardSelection ssfs = new SubsetSizeForwardSelection();
+	// ssfs.set
+	
 	AttributeSelection attributeSelection = new AttributeSelection();
 	attributeSelection.setSearch(lfs);
 	attributeSelection.setInputFormat(instances);
-	attributeSelection.setEvaluator(evaluator);
+//	attributeSelection.setEvaluator(evaluator);
 	Instances out = Filter.useFilter(instances, attributeSelection);
 	return out;
     }
@@ -255,7 +263,9 @@ public class LibWeka extends Lib {
 	    Instances out = null;
 	    int nWekaFeatures = -1;
 
+	    ArrayList<HashMap<String, Integer>> attributeValueCounts = getAttributeValueCounts();
 	    Map<String, FastVector> themap = getNominalMap();
+
 	    for (int featnum = 1; featnum < themap.keySet().size(); featnum++) {
 		String featname = "" + featnum;
 		// All attributes here are nominal now.
@@ -289,7 +299,13 @@ public class LibWeka extends Lib {
 		instance.setDataset(out);
 		for (int featnum = 1; featnum < nWekaFeatures; featnum++) {
 		    Attribute att = (Attribute) attinfo.elementAt(featnum - 1);
-		    instance.setValue(att, columns[featnum]);
+
+		    String val = columns[featnum];
+		    if (attributeValueCounts.get(featnum - 1).get(val) >= minValueCount) {
+			instance.setValue(att, val);
+		    } else {
+			instance.setValue(att, OOV);
+		    }
 		}
 		instance.setClassValue(instanceClass);
 		out.add(instance);
@@ -374,6 +390,7 @@ public class LibWeka extends Lib {
 	if (nominalMap != null) {
 	    return nominalMap;
 	}
+	ArrayList<HashMap<String, Integer>> attributeValueCounts = getAttributeValueCounts();
 	BufferedReader reader = new BufferedReader(
 		getInstanceInputStreamReader(".ins"));
 	HashMap<String, HashSet<String>> featuresToValues = new HashMap<String, HashSet<String>>();
@@ -382,17 +399,19 @@ public class LibWeka extends Lib {
 		String line = reader.readLine();
 		if (line == null)
 		    break;
-
 		String[] columns = tabPattern.split(line);
-
 		for (int featnum = 0; featnum < columns.length; featnum++) {
 		    String featname = (featnum == 0) ? "CLASS" : "" + featnum;
 		    String val = columns[featnum];
 		    if (!featuresToValues.containsKey(featname)) {
 			featuresToValues.put(featname, new HashSet<String>());
-			featuresToValues.get(featname).add("OOV");
+			if (featnum != 0) {
+			    featuresToValues.get(featname).add(OOV);
+			}
 		    }
-		    featuresToValues.get(featname).add(val);
+		    if (featnum == 0 || attributeValueCounts.get(featnum - 1).get(val) >= minValueCount) {
+			featuresToValues.get(featname).add(val);
+		    }
 		}
 	    }
 	    reader.close();
@@ -409,6 +428,53 @@ public class LibWeka extends Lib {
 	    out.put(featname, vec);
 	}
 	nominalMap = out;
+	return out;
+    }
+
+    public ArrayList<HashMap<String, Integer>> getAttributeValueCounts()
+	    throws MaltChainedException {
+	if (save_attributeValueCounts == null) {
+	    save_attributeValueCounts = countAttributeValues();
+	}
+	return save_attributeValueCounts;
+    }
+
+    private ArrayList<HashMap<String, Integer>> countAttributeValues()
+	    throws MaltChainedException {
+	// weka with its magic non-parametrized types.
+	ArrayList<HashMap<String, Integer>> out = new ArrayList<HashMap<String, Integer>>();
+	int numAttributes = 0;
+
+	try {
+	    BufferedReader reader = new BufferedReader(
+		    getInstanceInputStreamReader(".ins"));
+	    while (true) {
+		String line = reader.readLine();
+		if (line == null)
+		    break;
+		String[] columns = tabPattern.split(line);
+
+		if (out.size() == 0) {
+		    numAttributes = columns.length;
+		    // populate the output array.
+		    for (int i = 0; i < numAttributes; i++) {
+			out.add(new HashMap<String, Integer>());
+		    }
+		}
+
+		for (int featnum = 1; featnum < columns.length; featnum++) {
+		    HashMap<String, Integer> valueCounts = out.get(featnum - 1);
+		    String val = columns[featnum];
+		    if (!valueCounts.containsKey(val)) {
+			valueCounts.put(val, 0);
+		    }
+		    valueCounts.put(val, valueCounts.get(val) + 1);
+		}
+	    }
+	    reader.close();
+	} catch (IOException e) {
+	    throw new MaltChainedException("No instances found in file", e);
+	}
 	return out;
     }
 }
