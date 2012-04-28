@@ -25,7 +25,9 @@ import org.maltparser.ml.lib.MaltLibModel;
 import org.maltparser.parser.guide.instance.InstanceModel;
 import org.maltparser.parser.history.action.SingleDecision;
 
+import weka.attributeSelection.ChiSquaredAttributeEval;
 import weka.attributeSelection.GainRatioAttributeEval;
+import weka.attributeSelection.InfoGainAttributeEval;
 import weka.attributeSelection.Ranker;
 import weka.classifiers.Classifier;
 import weka.classifiers.functions.Logistic;
@@ -205,6 +207,9 @@ public class LibWeka extends Lib {
     private Instances binarizeAndFilter(Instances instances) throws Exception {
 	System.out.println("num attributes initially: "
 		+ instances.numAttributes());
+	// instances = simpleFilterAttributes(instances, 7);
+	// System.out.println("num attributes after first filter: "
+	// + instances.numAttributes());
 	NominalToBinary nominalToBinary = new NominalToBinary();
 	nominalToBinary.setInputFormat(instances);
 	instances = Filter.useFilter(instances, nominalToBinary);
@@ -223,10 +228,15 @@ public class LibWeka extends Lib {
 	}
 	Ranker ranker = new Ranker();
 	ranker.setNumToSelect(maxAttributes);
-	GainRatioAttributeEval grae = new GainRatioAttributeEval();
-	grae.buildEvaluator(instances);
-	int[] ranked = ranker.search(grae, instances);
-	System.out.println("ranked.");
+	BinaryInfoGainAttributeEval bigae = new BinaryInfoGainAttributeEval();
+	bigae.buildEvaluator(instances);
+	// GainRatioAttributeEval grae = new GainRatioAttributeEval();
+	// grae.buildEvaluator(instances);
+	// ChiSquaredAttributeEval chisquared = new ChiSquaredAttributeEval();
+	// chisquared.buildEvaluator(instances);
+	System.out.println("built the evaluator.");
+	int[] ranked = ranker.search(bigae, instances);
+	System.out.println("successfully ranked.");
 	StringBuilder sb = new StringBuilder();
 	for (int i = 0; i < maxAttributes; i++) {
 	    if (i != 0) {
