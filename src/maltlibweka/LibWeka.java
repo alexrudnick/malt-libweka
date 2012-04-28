@@ -8,7 +8,6 @@ import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -28,8 +27,9 @@ import org.maltparser.ml.lib.MaltLibModel;
 import org.maltparser.parser.guide.instance.InstanceModel;
 import org.maltparser.parser.history.action.SingleDecision;
 
-import weka.attributeSelection.CfsSubsetEval;
+import weka.attributeSelection.GainRatioAttributeEval;
 import weka.attributeSelection.LinearForwardSelection;
+import weka.attributeSelection.Ranker;
 import weka.attributeSelection.SubsetSizeForwardSelection;
 import weka.classifiers.Classifier;
 import weka.classifiers.functions.Logistic;
@@ -41,7 +41,7 @@ import weka.core.SelectedTag;
 import weka.filters.Filter;
 import weka.filters.supervised.attribute.AttributeSelection;
 import weka.filters.supervised.attribute.NominalToBinary;
-import weka.filters.unsupervised.attribute.RemoveUseless;
+import weka.filters.unsupervised.attribute.Remove;
 
 /**
  * Extends MaltParser with parameterizable Weka classifiers. Extends the same
@@ -118,7 +118,7 @@ public class LibWeka extends Lib {
 
 	    Instances instances = buildWekaInstances(getInstanceInputStreamReader(".ins"));
 	    System.out.println("got instances");
-	    
+
 	    // Pull up an object of a type specified in the options.
 	    // Possible classes are defined in appdata/options.xml.
 	    @SuppressWarnings("unchecked")
@@ -131,13 +131,12 @@ public class LibWeka extends Lib {
 	    instances = classifierSpecificHacks(instances, classifier);
 	    FastVector attinfoPostHacks = getAttInfo(instances);
 	    System.out.println("specific hacks done");
-	    
 
 	    String optstring = owner.getGuide().getConfiguration()
 		    .getOptionValueString("libweka", "wekaopts");
 	    String[] wekaopts = optstring.split(" ");
 	    classifier.setOptions(wekaopts);
-	    
+
 	    System.out.println("training classifier...");
 	    System.out.println("num instances: " + instances.numInstances());
 	    System.out.println("num attributes: " + instances.numAttributes());
@@ -217,41 +216,42 @@ public class LibWeka extends Lib {
 	instances = Filter.useFilter(instances, nominalToBinary);
 	System.out.println("num attributes after binarization: "
 		+ instances.numAttributes());
-	instances = filterAttributes(instances, 100);
+	instances = simpleFilterAttributes(instances, 300);
 	System.out.println("num attributes at the end: "
 		+ instances.numAttributes());
 	return instances;
     }
 
-    private Instances filterAttributes(Instances instances,
-	    final int maxAttributes) throws Exception {
-	LinearForwardSelection lfs = new LinearForwardSelection();
-	lfs.setType(new SelectedTag(0, LinearForwardSelection.TAGS_TYPE));
-	lfs.setNumUsedAttributes(maxAttributes);
-	lfs.setSearchTermination(5);
-//	CfsSubsetEval evaluator = new CfsSubsetEval() {
-//	    private static final long serialVersionUID = 4256412140715016639L;
-//
-//	    @Override
-//	    public double evaluateSubset(BitSet subset) throws Exception {
-//		double out = super.evaluateSubset(subset);
-//		if (subset.cardinality() < maxAttributes) {
-//		    return out;
-//		} else {
-//		    System.out.println("ZERO!");
-//		    return 0;
-//		}
-//	    }
-//	};
-	// XXX(alexr): this way too slow. How do we make it faster?
-	SubsetSizeForwardSelection ssfs = new SubsetSizeForwardSelection();
-	// ssfs.set
-	
-	AttributeSelection attributeSelection = new AttributeSelection();
-	attributeSelection.setSearch(lfs);
-	attributeSelection.setInputFormat(instances);
-//	attributeSelection.setEvaluator(evaluator);
-	Instances out = Filter.useFilter(instances, attributeSelection);
+    private Instances simpleFilterAttributes(Instances instances,
+	    int maxAttributes) throws Exception {
+	if (maxAttributes >= instances.numAttributes()) {
+	    return new Instances(instances);
+	}
+	Ranker ranker = new Ranker();
+	ranker.setNumToSelect(maxAttributes);
+	GainRatioAttributeEval grae = new GainRatioAttributeEval();
+	grae.buildEvaluator(instances);
+	int[] ranked = ranker.search(grae, instances);
+	System.out.println("ranked.");
+	StringBuilder sb = new StringBuilder();
+	for (int i = 0; i < maxAttributes; i++) {
+	    if (i != 0) {
+		sb.append(",");
+	    }
+	    // Remove uses 1-indexes like a champ.
+	    sb.append(ranked[i] + 1);
+	}
+	sb.append("," + (instances.classIndex() + 1));
+
+	Remove remove = new Remove();
+	remove.setAttributeIndices(sb.toString());
+	remove.setInvertSelection(true);
+	remove.setInputFormat(instances);
+	System.out.println("not deleting: " + sb);
+
+	Instances out = Filter.useFilter(instances, remove);
+	System.out.println("after filtering, num attributes: "
+		+ out.numAttributes());
 	return out;
     }
 
@@ -327,18 +327,6 @@ public class LibWeka extends Lib {
 
     public void initLibOptions() {
 	libOptions = new LinkedHashMap<String, String>();
-	libOptions.put("s", Integer.toString(svm_parameter.C_SVC));
-	libOptions.put("t", Integer.toString(svm_parameter.POLY));
-	libOptions.put("d", Integer.toString(2));
-	libOptions.put("g", Double.toString(0.2));
-	libOptions.put("r", Double.toString(0));
-	libOptions.put("n", Double.toString(0.5));
-	libOptions.put("m", Integer.toString(100));
-	libOptions.put("c", Double.toString(1));
-	libOptions.put("e", Double.toString(1.0));
-	libOptions.put("p", Double.toString(0.1));
-	libOptions.put("h", Integer.toString(1));
-	libOptions.put("b", Integer.toString(0));
     }
 
     /**
@@ -375,7 +363,7 @@ public class LibWeka extends Lib {
     }
 
     public void initAllowedLibOptionFlags() {
-	allowedLibOptionFlags = "stdgrnmcepb";
+	allowedLibOptionFlags = "";
     }
 
     /**
@@ -409,7 +397,8 @@ public class LibWeka extends Lib {
 			    featuresToValues.get(featname).add(OOV);
 			}
 		    }
-		    if (featnum == 0 || attributeValueCounts.get(featnum - 1).get(val) >= minValueCount) {
+		    if (featnum == 0
+			    || attributeValueCounts.get(featnum - 1).get(val) >= minValueCount) {
 			featuresToValues.get(featname).add(val);
 		    }
 		}
@@ -431,6 +420,15 @@ public class LibWeka extends Lib {
 	return out;
     }
 
+    /**
+     * Accessor for the attribute-value counts; computes them on demand if
+     * needed.
+     * 
+     * @return An ArrayList where each element is a Map mapping from a given
+     *         possible value to the count of times it occurred in the training
+     *         data. Positions correspond to the positions of the attribute.
+     * @throws MaltChainedException
+     */
     public ArrayList<HashMap<String, Integer>> getAttributeValueCounts()
 	    throws MaltChainedException {
 	if (save_attributeValueCounts == null) {
@@ -439,6 +437,13 @@ public class LibWeka extends Lib {
 	return save_attributeValueCounts;
     }
 
+    /**
+     * Produce the list of maps, where each map contains the counts for each
+     * value, for the attribute in the corresponding position.
+     * 
+     * @return
+     * @throws MaltChainedException
+     */
     private ArrayList<HashMap<String, Integer>> countAttributeValues()
 	    throws MaltChainedException {
 	// weka with its magic non-parametrized types.
