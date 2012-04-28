@@ -20,5 +20,5 @@ LEARNER=$2
 WEKACLASSIFIER=$3
 
 for n in `seq 1 11`; do
-  scripts/run_experiment.sh "$LANG"_"$n"000 $LEARNER $WEKACLASSIFIER testsets/"$LANG"_test.conll
+  scripts/run_experiment.sh "$LANG"_"$n"000 $LEARNER $WEKACLASSIFIER "-M 2" testsets/"$LANG"_test.conll
 done

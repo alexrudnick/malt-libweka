@@ -13,8 +13,6 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import libsvm.svm_parameter;
-
 import org.maltparser.core.exception.MaltChainedException;
 import org.maltparser.core.feature.FeatureVector;
 import org.maltparser.core.feature.value.FeatureValue;
@@ -28,18 +26,14 @@ import org.maltparser.parser.guide.instance.InstanceModel;
 import org.maltparser.parser.history.action.SingleDecision;
 
 import weka.attributeSelection.GainRatioAttributeEval;
-import weka.attributeSelection.LinearForwardSelection;
 import weka.attributeSelection.Ranker;
-import weka.attributeSelection.SubsetSizeForwardSelection;
 import weka.classifiers.Classifier;
 import weka.classifiers.functions.Logistic;
 import weka.core.Attribute;
 import weka.core.FastVector;
 import weka.core.Instance;
 import weka.core.Instances;
-import weka.core.SelectedTag;
 import weka.filters.Filter;
-import weka.filters.supervised.attribute.AttributeSelection;
 import weka.filters.supervised.attribute.NominalToBinary;
 import weka.filters.unsupervised.attribute.Remove;
 
@@ -63,7 +57,7 @@ public class LibWeka extends Lib {
 
     private ArrayList<HashMap<String, Integer>> save_attributeValueCounts;
 
-    private Integer minValueCount = 5;
+    private Integer minValueCount = 20;
 
     public LibWeka(InstanceModel owner, Integer learnerMode)
 	    throws MaltChainedException {
@@ -216,7 +210,7 @@ public class LibWeka extends Lib {
 	instances = Filter.useFilter(instances, nominalToBinary);
 	System.out.println("num attributes after binarization: "
 		+ instances.numAttributes());
-	instances = simpleFilterAttributes(instances, 300);
+	instances = simpleFilterAttributes(instances, 200);
 	System.out.println("num attributes at the end: "
 		+ instances.numAttributes());
 	return instances;
