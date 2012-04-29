@@ -12,9 +12,6 @@ import weka.core.Instance;
 import weka.core.Instances;
 import weka.core.Option;
 import weka.core.OptionHandler;
-import weka.core.RevisionUtils;
-import weka.core.Utils;
-import weka.filters.Filter;
 import weka.filters.supervised.attribute.Discretize;
 import weka.filters.unsupervised.attribute.NumericToBinary;
 
@@ -54,9 +51,6 @@ public class BinaryInfoGainAttributeEval extends ASEvaluation implements
 
     /** for serialization */
     private static final long serialVersionUID = 7015976717661257014L;
-
-    /** Treat missing values as a seperate value */
-    private boolean m_missing_merge;
 
     /** Just binarize numeric attributes */
     private boolean m_Binarize;
@@ -104,19 +98,6 @@ public class BinaryInfoGainAttributeEval extends ASEvaluation implements
      */
     public String[] getOptions() {
 	String[] options = new String[2];
-	int current = 0;
-
-	if (!getMissingMerge()) {
-	    options[current++] = "-M";
-	}
-	if (getBinarizeNumericAttributes()) {
-	    options[current++] = "-B";
-	}
-
-	while (current < options.length) {
-	    options[current++] = "";
-	}
-
 	return options;
     }
 
@@ -150,37 +131,6 @@ public class BinaryInfoGainAttributeEval extends ASEvaluation implements
     }
 
     /**
-     * Returns the tip text for this property
-     * 
-     * @return tip text for this property suitable for displaying in the
-     *         explorer/experimenter gui
-     */
-    public String missingMergeTipText() {
-	return "Distribute counts for missing values. Counts are distributed "
-		+ "across other values in proportion to their frequency. Otherwise, "
-		+ "missing is treated as a separate value.";
-    }
-
-    /**
-     * distribute the counts for missing values across observed values
-     * 
-     * @param b
-     *            true=distribute missing values.
-     */
-    public void setMissingMerge(boolean b) {
-	m_missing_merge = b;
-    }
-
-    /**
-     * get whether missing values are being distributed or not
-     * 
-     * @return true if missing values are being distributed.
-     */
-    public boolean getMissingMerge() {
-	return m_missing_merge;
-    }
-
-    /**
      * Returns the capabilities of this evaluator.
      * 
      * @return the capabilities of this evaluator
@@ -193,7 +143,6 @@ public class BinaryInfoGainAttributeEval extends ASEvaluation implements
 	result.enable(Capability.NUMERIC_ATTRIBUTES);
 	// class
 	result.enable(Capability.NOMINAL_CLASS);
-	result.enable(Capability.MISSING_CLASS_VALUES);
 	return result;
     }
 
@@ -211,26 +160,15 @@ public class BinaryInfoGainAttributeEval extends ASEvaluation implements
 	getCapabilities().testWithFail(data);
 	int classIndex = data.classIndex();
 	int numInstances = data.numInstances();
-
 	int numClasses = data.attribute(classIndex).numValues();
 
 	// Reserve space and initialize counters
-	double[][][] counts = new double[data.numAttributes()][][];
-	for (int k = 0; k < data.numAttributes(); k++) {
-	    if (k != classIndex) {
-		int numValues = data.attribute(k).numValues();
-		counts[k] = new double[numValues + 1][numClasses + 1];
-	    }
-	}
+	double[][][] counts = new double[data.numAttributes()][2][numClasses +1];
 	// Initialize counters
 	double[] temp = new double[numClasses + 1];
 	for (int k = 0; k < numInstances; k++) {
 	    Instance inst = data.instance(k);
-	    if (inst.classIsMissing()) {
-		temp[numClasses] += inst.weight();
-	    } else {
-		temp[(int) inst.classValue()] += inst.weight();
-	    }
+	    temp[(int) inst.classValue()] += inst.weight();
 	}
 	for (int k = 0; k < counts.length; k++) {
 	    if (k != classIndex) {
@@ -239,16 +177,27 @@ public class BinaryInfoGainAttributeEval extends ASEvaluation implements
 		}
 	    }
 	}
-
 	// Get counts
 	for (int k = 0; k < numInstances; k++) {
 	    Instance inst = data.instance(k);
+	    int classval = (int) inst.classValue();
 	    for (int i = 0; i < inst.numValues(); i++) {
 		if (inst.index(i) != classIndex) {
-		    counts[inst.index(i)][(int) inst.value(i)][(int) inst
-		                                                     .classValue()] += inst.weight();
-		    counts[inst.index(i)][0][(int) inst.classValue()] -= inst
-			    .weight();
+		    int attval = (int) inst.value(i);
+		    try { 
+			counts[i][attval][classval] += inst.weight();
+			counts[i][0][classval] -= inst.weight();
+		    } catch (Exception e) {
+			e.printStackTrace();
+			System.out.println(i);
+			System.out.println("attval: " + attval);
+			System.out.println("classval: " + classval);
+			System.out.println(counts.length);
+			System.out.println(counts[i].length);
+			System.out.println(counts[i][0].length);
+			System.out.println(counts[i][attval].length);
+			System.exit(1);
+		    }
 		}
 	    }
 	}
@@ -269,7 +218,6 @@ public class BinaryInfoGainAttributeEval extends ASEvaluation implements
      */
     protected void resetOptions() {
 	m_InfoGains = null;
-	m_missing_merge = true;
     }
 
     /**
@@ -283,7 +231,6 @@ public class BinaryInfoGainAttributeEval extends ASEvaluation implements
      *             if the attribute could not be evaluated
      */
     public double evaluateAttribute(int attribute) throws Exception {
-
 	return m_InfoGains[attribute];
     }
 

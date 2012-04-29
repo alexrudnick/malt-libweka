@@ -25,9 +25,6 @@ import org.maltparser.ml.lib.MaltLibModel;
 import org.maltparser.parser.guide.instance.InstanceModel;
 import org.maltparser.parser.history.action.SingleDecision;
 
-import weka.attributeSelection.ChiSquaredAttributeEval;
-import weka.attributeSelection.GainRatioAttributeEval;
-import weka.attributeSelection.InfoGainAttributeEval;
 import weka.attributeSelection.Ranker;
 import weka.classifiers.Classifier;
 import weka.classifiers.functions.Logistic;
@@ -59,7 +56,7 @@ public class LibWeka extends Lib {
 
     private ArrayList<HashMap<String, Integer>> save_attributeValueCounts;
 
-    private Integer minValueCount = 20;
+    private Integer minValueCount = 50;
 
     public LibWeka(InstanceModel owner, Integer learnerMode)
 	    throws MaltChainedException {
@@ -210,12 +207,18 @@ public class LibWeka extends Lib {
 	// instances = simpleFilterAttributes(instances, 7);
 	// System.out.println("num attributes after first filter: "
 	// + instances.numAttributes());
-	NominalToBinary nominalToBinary = new NominalToBinary();
-	nominalToBinary.setInputFormat(instances);
-	instances = Filter.useFilter(instances, nominalToBinary);
+	try {
+	// NominalToBinary nominalToBinary = new NominalToBinary();
+	// nominalToBinary.setInputFormat(instances);
+	// instances = Filter.useFilter(instances, nominalToBinary);
+	    instances = FastBinarizer.fastBinarize(instances);
+	} catch (OutOfMemoryError e) {
+	    e.printStackTrace();
+	    System.exit(1);
+	}
 	System.out.println("num attributes after binarization: "
 		+ instances.numAttributes());
-	instances = simpleFilterAttributes(instances, 200);
+	instances = simpleFilterAttributes(instances, 150);
 	System.out.println("num attributes at the end: "
 		+ instances.numAttributes());
 	return instances;

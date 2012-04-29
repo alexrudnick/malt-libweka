@@ -1,6 +1,10 @@
 *.class
 trainingoutput
 testingoutput
+swedish*
+portuguese*
+dutch*
+danish*
 
 # Package Files #
 *.jar
