@@ -12,8 +12,7 @@ import weka.core.Attribute;
 import weka.core.FastVector;
 import weka.core.Instance;
 import weka.core.Instances;
-import weka.filters.Filter;
-import weka.filters.supervised.attribute.NominalToBinary;
+import weka.core.SparseInstance;
 
 public class MaltLibWekaModel implements Serializable, MaltLibModel {
     private static final long serialVersionUID = 3423414687296070741L;
@@ -149,7 +148,7 @@ public class MaltLibWekaModel implements Serializable, MaltLibModel {
 	Instances out = new Instances("MaltFeatures", attInfoPostHacks, 0);
 	out.setClassIndex(out.numAttributes() - 1);
 	Instance nominal = nominals.firstInstance();
-	Instance binarized = new Instance(attInfoPostHacks.size());
+	SparseInstance binarized = new SparseInstance(attInfoPostHacks.size());
 
 	for (int i = 0; i < attInfoPostHacks.size(); i++) {
 	    Attribute binAttribute = (Attribute) attInfoPostHacks.elementAt(i);

@@ -33,7 +33,6 @@ import weka.core.FastVector;
 import weka.core.Instance;
 import weka.core.Instances;
 import weka.filters.Filter;
-import weka.filters.supervised.attribute.NominalToBinary;
 import weka.filters.unsupervised.attribute.Remove;
 
 /**
@@ -56,7 +55,7 @@ public class LibWeka extends Lib {
 
     private ArrayList<HashMap<String, Integer>> save_attributeValueCounts;
 
-    private Integer minValueCount = 50;
+    private Integer minValueCount = 5;
 
     public LibWeka(InstanceModel owner, Integer learnerMode)
 	    throws MaltChainedException {
@@ -204,13 +203,7 @@ public class LibWeka extends Lib {
     private Instances binarizeAndFilter(Instances instances) throws Exception {
 	System.out.println("num attributes initially: "
 		+ instances.numAttributes());
-	// instances = simpleFilterAttributes(instances, 7);
-	// System.out.println("num attributes after first filter: "
-	// + instances.numAttributes());
 	try {
-	// NominalToBinary nominalToBinary = new NominalToBinary();
-	// nominalToBinary.setInputFormat(instances);
-	// instances = Filter.useFilter(instances, nominalToBinary);
 	    instances = FastBinarizer.fastBinarize(instances);
 	} catch (OutOfMemoryError e) {
 	    e.printStackTrace();
@@ -218,7 +211,7 @@ public class LibWeka extends Lib {
 	}
 	System.out.println("num attributes after binarization: "
 		+ instances.numAttributes());
-	instances = simpleFilterAttributes(instances, 150);
+	instances = simpleFilterAttributes(instances, 200);
 	System.out.println("num attributes at the end: "
 		+ instances.numAttributes());
 	return instances;

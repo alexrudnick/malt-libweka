@@ -6,6 +6,7 @@ import weka.core.Attribute;
 import weka.core.FastVector;
 import weka.core.Instance;
 import weka.core.Instances;
+import weka.core.SparseInstance;
 
 /**
  * Utility class to binarize weka Instances where all of the attributes are
@@ -18,7 +19,8 @@ public class FastBinarizer {
      * Given a weka dataset with nominal attributes (and only nominal
      * attributes, except possibly the class attribute), produce a new weka
      * dataset where all of the attributes are binary numeric ones. The class
-     * attribute should remain unchanged.
+     * attribute should remain unchanged. NB: this deletes all instances from
+     * the incoming dataset.
      * 
      * @param instances
      * @return
@@ -49,11 +51,10 @@ public class FastBinarizer {
 	Instances out = new Instances("MaltFeatures", attinfo, 0);
 	out.setClassIndex(out.numAttributes() - 1);
 
-	Enumeration<Instance> nomInstances = (Enumeration<Instance>) instances
-		.enumerateInstances();
-	while (nomInstances.hasMoreElements()) {
-	    Instance nomInstance = nomInstances.nextElement();
-	    Instance binarized = new Instance(attinfo.size());
+	int instancesBuilt = 0;
+	while (instances.numInstances() > 0) {
+	    Instance nomInstance = instances.lastInstance();
+	    SparseInstance sparseBinarized = new SparseInstance(attinfo.size());
 	    for (int i = 0; i < attinfo.size(); i++) {
 		Attribute binAttribute = (Attribute) attinfo.elementAt(i);
 		if (binAttribute.name().equals("CLASS"))
@@ -62,12 +63,18 @@ public class FastBinarizer {
 		// names of attributes start at 1.
 		int field = Integer.parseInt(splitted[0]) - 1;
 		String val = splitted[1];
-		binarized.setValue(i, nomInstance.stringValue(field)
+		sparseBinarized.setValue(i, nomInstance.stringValue(field)
 			.equals(val) ? 1 : 0);
 	    }
-	    binarized.setDataset(out);
-	    binarized.setClassValue(nomInstance.classValue());
-	    out.add(binarized);
+	    sparseBinarized.setDataset(out);
+	    sparseBinarized.setClassValue(nomInstance.classValue());
+	    instancesBuilt++;
+	    if (instancesBuilt % 5000 == 0) {
+		System.out.println("built this many instances: "
+			+ instancesBuilt);
+	    }
+	    instances.delete(instances.numInstances() - 1);
+	    out.add(sparseBinarized);
 	}
 	System.out.println("FastBinarizer: built new instances.");
 	return out;
