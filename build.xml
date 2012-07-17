@@ -5,6 +5,7 @@
         <pathelement location="lib/weka-3.6.6.jar"/>
         <pathelement location="lib/log4j.jar"/>
         <pathelement location="lib/libsvm.jar"/>
+        <pathelement location="lib/commons-net-3.1.jar"/>
     </path>
 
     <!-- set global properties for this build -->
@@ -32,6 +33,7 @@
 
     <target name="updatemalt"
             description="replace to options.xml in the malt jar.">
+        <touch file="config/appdata/options.xml"/>
         <jar jarfile="lib/maltparser-1.7.1.jar"
              update="true"
              basedir="config"/>
