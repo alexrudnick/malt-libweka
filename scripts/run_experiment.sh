@@ -88,6 +88,11 @@ if [ $# -eq $EXPECTED_ARGS_WEKA_OPTION ]; then
     > trainingoutput
 fi
 
+if [ "$WEKACLASSIFIER" == "timbl" ]; then
+  mv /tmp/thedataset ./timbl_$MODELNAME
+  /usr/local/bin/timblserver -f ./timbl_$MODELNAME -S 7000
+fi
+
 ## testing part
 echo "OK NOW TESTING."
 java -Xmx8192m \
@@ -97,6 +102,10 @@ java -Xmx8192m \
   -m parse \
   -o $OUTFILE \
   > testingoutput
+
+if [ "$WEKACLASSIFIER" == "timbl" ]; then
+  killall -9 timblserver
+fi
 
 ## evaluate.
 echo "OK NOW EVALUATING."
