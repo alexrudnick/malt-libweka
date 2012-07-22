@@ -52,7 +52,7 @@ MODELNAME=$EXPNAME
 OUTFILE=$EXPNAME"_outfile.conll"
 RESULTS="results/"$EXPNAME".results"
 
-CLASSPATH=lib/libsvm.jar:lib/log4j.jar:lib/maltparser-1.7.1.jar:lib/weka-3.6.6.jar:dist/lib/maltlibweka.jar:lib/commons-net-3.1.jar
+CLASSPATH=lib/libsvm.jar:lib/liblinear-1.8.jar:lib/log4j.jar:lib/maltparser-1.7.1.jar:lib/weka-3.6.6.jar:dist/lib/maltlibweka.jar:lib/commons-net-3.1.jar
 
 ## training part
 if [ $# -eq $EXPECTED_ARGS_NONWEKA ]; then
